@@ -1,5 +1,7 @@
 
+# Skripty a reporty - Český bridžový svaz
 
+Tento repozitář obsahuje skripty a reporty pro Český bridžový svaz.
 
 ## Problems and solutions
 
