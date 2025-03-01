@@ -1,22 +1,31 @@
 import streamlit as st
 import pandas as pd
-from src.matrikadb import connect_to_db
+import pyodbc
 
 st.set_page_config(
     page_title="SPORTOVCI ČBS", page_icon="♣️", layout="wide"
 )
 
+@st.cache_resource
+def init_connection():
+    return pyodbc.connect(
+        "DRIVER={ODBC Driver 17 for SQL Server};SERVER="
+        + st.secrets["server"]
+        + ";DATABASE="
+        + st.secrets["database"]
+        + ";UID="
+        + st.secrets["username"]
+        + ";PWD="
+        + st.secrets["password"]
+    )
+    
+conn = init_connection()
+
 # Load data
 @st.cache_data
 def load_data():
-    credentials = {
-        "server": st.secrets["MATRIKA_DB_SERVER"],
-        "database": st.secrets["MATRIKA_DB_NAME"],
-        "username": st.secrets["MATRIKA_DB_USERNAME"],
-        "password": st.secrets["MATRIKA_DB_PASSWORD"],
-    }
 
-    conn = connect_to_db(**credentials)
+
     ucasti_sql = """
     SELECT 
         h.Legitimace,
