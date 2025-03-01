@@ -16,7 +16,7 @@ def init_connection():
         + ";UID="
         + st.secrets["username"]
         + ";TrustServerCertificate=yes"
-        + ";Encrypt=No"
+        + ";Encrypt=yes"
         + ";PWD="
         + st.secrets["password"]
     )
