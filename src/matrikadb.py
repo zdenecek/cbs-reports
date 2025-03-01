@@ -26,14 +26,7 @@ def get_env_vars():
 
     return env_vars
 
-def connect_to_db():
-
-
-    env_vars = get_env_vars()
-    server = env_vars['server']
-    database = env_vars['database']
-    username = env_vars['username'] 
-    password = env_vars['password']
+def connect_to_db(server, database, username, password):
 
 
     # Create connection string for MSSQL 2019
