@@ -159,10 +159,7 @@ try:
         .rename(columns={"DobaTurnaje": "Pocet dni"})
     )
 
-    # Filter players with more than 6 days
-    sportovci_nad_6_dni = sportovci_dny[sportovci_dny["Pocet dni"] >= 6].sort_values(
-        "Pocet dni", ascending=False
-    )
+
     
     # Check if we're in "show participations" mode via URL
     params = st.query_params
@@ -246,8 +243,8 @@ try:
         # Sidebar filters
         st.sidebar.header("Filtry")
 
-        min_rok = int(sportovci_nad_6_dni["Rocnik"].min())
-        max_rok = int(sportovci_nad_6_dni["Rocnik"].max())
+        min_rok = int(sportovci_dny["Rocnik"].min())
+        max_rok = int(sportovci_dny["Rocnik"].max())
 
         # rok_od, rok_do = st.sidebar.slider(
         #     "Rozmezí roků narození:",
@@ -260,16 +257,16 @@ try:
             "Minimální počet dní účasti:", min_value=1, value=6
         )
 
-        kluby = sorted(sportovci_nad_6_dni["KlubNazev"].unique())
+        kluby = sorted(sportovci_dny["KlubNazev"].unique())
         vybrane_kluby = st.sidebar.multiselect(
             "Filtrovat podle klubu:", options=kluby, default=[]
         )
 
         # Apply filters
-        filtered_df = sportovci_nad_6_dni[
-            (sportovci_nad_6_dni["Pocet dni"] >= min_dny) 
-            # & (sportovci_nad_6_dni["Rocnik"] >= rok_od)
-            # & (sportovci_nad_6_dni["Rocnik"] <= rok_do)
+        filtered_df = sportovci_dny[
+            (sportovci_dny["Pocet dni"] >= min_dny) 
+            # & (sportovci_dny["Rocnik"] >= rok_od)
+            # & (sportovci_dny["Rocnik"] <= rok_do)
              
         ]
 
@@ -298,7 +295,7 @@ try:
         # Display metrics
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Celkový počet sportovců", len(sportovci_nad_6_dni))
+            st.metric("Celkový počet sportovců", len(sportovci_dny))
         with col2:
             st.metric("Počet filtrovaných sportovců", len(filtered_df))
 
@@ -381,7 +378,7 @@ try:
             mime="text/csv",
         )
 
-        csv_all = sportovci_nad_6_dni.to_csv(index=False).encode("utf-8")
+        csv_all = sportovci_dny.to_csv(index=False).encode("utf-8")
         st.download_button(
             label="Stáhnout kompletní seznam (CSV)",
             data=csv_all,
@@ -404,7 +401,7 @@ try:
         # Display metrics
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Celkový počet účastí", len(df[df['Legitimace'].isin(sportovci_nad_6_dni['Legitimace'])]))
+            st.metric("Celkový počet účastí", len(df[df['Legitimace'].isin(sportovci_dny['Legitimace'])]))
         with col2:
             st.metric("Počet filtrovaných účastí", len(all_participations_df))
         
