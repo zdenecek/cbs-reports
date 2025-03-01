@@ -249,12 +249,12 @@ try:
         min_rok = int(sportovci_nad_6_dni["Rocnik"].min())
         max_rok = int(sportovci_nad_6_dni["Rocnik"].max())
 
-        rok_od, rok_do = st.sidebar.slider(
-            "Rozmezí roků narození:",
-            min_value=min_rok,
-            max_value=max_rok,
-            value=(1975, 2001),
-        )
+        # rok_od, rok_do = st.sidebar.slider(
+        #     "Rozmezí roků narození:",
+        #     min_value=min_rok,
+        #     max_value=max_rok,
+        #     value=(1975, 2001),
+        # )
 
         min_dny = st.sidebar.number_input(
             "Minimální počet dní účasti:", min_value=1, value=6
@@ -267,9 +267,10 @@ try:
 
         # Apply filters
         filtered_df = sportovci_nad_6_dni[
-            (sportovci_nad_6_dni["Rocnik"] >= rok_od)
-            & (sportovci_nad_6_dni["Rocnik"] <= rok_do)
-            & (sportovci_nad_6_dni["Pocet dni"] >= min_dny)
+            (sportovci_nad_6_dni["Pocet dni"] >= min_dny) 
+            # & (sportovci_nad_6_dni["Rocnik"] >= rok_od)
+            # & (sportovci_nad_6_dni["Rocnik"] <= rok_do)
+             
         ]
 
         if vybrane_kluby:
