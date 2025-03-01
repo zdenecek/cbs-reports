@@ -236,7 +236,7 @@ try:
         st.title("Report registrovaných sportovců Českého bridžového svazu")
         st.markdown("""
         Tento report zobrazuje seznam sportovců, kteří se zúčastnili více než 6 dnů soutěží 
-        v období od 1.11.2023 do 30.10.2024.
+        v období od 1.11.2023 do 30.10.2024 a mají zaplacené příspěvky za rok 2024.
         
         Data jsou načtena z matriky Českého bridžového svazu, která je dostupná na adrese https://matrikacbs.cz/
 
