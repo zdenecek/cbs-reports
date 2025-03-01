@@ -23,6 +23,23 @@ def init_connection():
     
 conn = init_connection()
 
+
+@st.cache_data
+def load_players():
+    q = """
+
+SELECT DISTINCT
+    Jmena, Prijmeni, Legitimace, Rocnik, k.Nazev as KlubNazev,
+    dbo.GetKategorieHrace(Rocnik, PohlaviM, null) as Kategorie
+FROM [db3206].[dbo].[Prispevek] p
+JOIN [db3206].[dbo].[Hrac] ON  Legitimace = p.IdHrace
+LEFT JOIN Klub k ON k.Id = IdKlubu
+WHERE p.IdSezony = 2024
+
+    """
+    df = pd.read_sql(q, conn)
+    return df
+
 # Load data
 @st.cache_data
 def load_data():
@@ -48,7 +65,7 @@ def load_data():
         COALESCE(r.Poradi, 0) as PoradiVZebricku,
         dbo.GetKategorieHrace(h.Rocnik, h.PohlaviM, null) as Kategorie
     FROM Hrac h
-    INNER JOIN Ucast u ON h.Legitimace = u.IdHrace
+    LEFT JOIN Ucast u ON h.Legitimace = u.IdHrace
     INNER JOIN Soutezici s ON s.Id = u.IdSouteziciho
     INNER JOIN Turnaj t ON t.Id = s.IdTurnaje
     LEFT JOIN Klub k ON k.Id = h.IdKlubu
@@ -61,6 +78,7 @@ def load_data():
     ORDER BY Prijmeni, Jmena
     """
     df = pd.read_sql(ucasti_sql, conn)
+    
 
     # Calculate tournament duration
     df["DobaTurnaje"] = (
@@ -100,6 +118,9 @@ def load_data():
     for tournament, days in long_tournament_mapping.items():
         df.loc[df["TurnajNazev"] == tournament, "DobaTurnaje"] = days
 
+    # Fill NA for kategorie
+    df["KategorieTurnaje"] = df["KategorieTurnaje"].fillna("Bez kategorie")
+
     return df
 
 
@@ -135,29 +156,8 @@ try:
 
     # Filter out unwanted categories and non-members
     df = df[
-        (~df["KategorieTurnaje"].isin(["Funbridge", "Klubové a jiné podobné turnaje"]))
-        & (df["KategorieTurnaje"].notna())
-        & (df["ClenPrispevek2024"] == "Ano")
+         (df["ClenPrispevek2024"] == "Ano")
     ]
-
-    # Group by player and calculate total days
-    sportovci_dny = (
-        df.groupby(
-            [
-                "Legitimace",
-                "Prijmeni",
-                "Jmena",
-                "Rocnik",
-                "KlubNazev",
-                "Body",
-                "PoradiVZebricku",
-                "Kategorie",
-            ]
-        )["DobaTurnaje"]
-        .sum()
-        .reset_index()
-        .rename(columns={"DobaTurnaje": "Pocet dni"})
-    )
 
 
     
@@ -243,8 +243,8 @@ try:
         # Sidebar filters
         st.sidebar.header("Filtry")
 
-        min_rok = int(sportovci_dny["Rocnik"].min())
-        max_rok = int(sportovci_dny["Rocnik"].max())
+        min_rok = int(df["Rocnik"].min())
+        max_rok = int(df["Rocnik"].max())
 
         # rok_od, rok_do = st.sidebar.slider(
         #     "Rozmezí roků narození:",
@@ -257,10 +257,45 @@ try:
             "Minimální počet dní účasti:", min_value=1, value=6
         )
 
-        kluby = sorted(sportovci_dny["KlubNazev"].unique())
+        kluby = sorted(df["KlubNazev"].unique())
         vybrane_kluby = st.sidebar.multiselect(
-            "Filtrovat podle klubu:", options=kluby, default=[]
+            "Filtrovat podle klubu:",
+            options=kluby,
+            default=[]
         )
+
+        # Add tournament category filter
+        st.sidebar.markdown("### Filtrovat podle kategorie turnaje:")
+        kategorie_turnaju = sorted([k for k in df['KategorieTurnaje'].unique() if pd.notna(k)])
+        vybrane_kategorie = st.sidebar.multiselect(
+            "Filtrovat podle kategorie turnaje:",
+            options=kategorie_turnaju,
+            default=[k for k in kategorie_turnaju if k not in ["Bez kategorie", "Klubové a jiné podobné turnaje", "Funbridge"]]
+        )
+        
+        all_participations_df = df
+        if vybrane_kategorie:
+            all_participations_df = all_participations_df[all_participations_df["KategorieTurnaje"].isin(vybrane_kategorie)]
+        
+        
+        sportovci_dny = (
+            all_participations_df.groupby(
+                [
+                    "Legitimace",
+                    "Prijmeni",
+                    "Jmena",
+                    "Rocnik",
+                    "KlubNazev",
+                    "Body",
+                    "PoradiVZebricku",
+                    "Kategorie",
+                ]
+            )["DobaTurnaje"]
+            .sum()
+            .reset_index()
+            .rename(columns={"DobaTurnaje": "Pocet dni"})
+        )
+
 
         # Apply filters
         filtered_df = sportovci_dny[
@@ -270,8 +305,8 @@ try:
              
         ]
 
-        if vybrane_kluby:
-            filtered_df = filtered_df[filtered_df["KlubNazev"].isin(vybrane_kluby)]
+
+
 
         # First create LegitimaceLink column
         display_df = filtered_df.copy()
@@ -291,6 +326,17 @@ try:
         display_df = display_df.rename(columns={"Body": "BodyCelkem"})
         cols = [col for col in display_df.columns if col != "BodyCelkem"] + ["BodyCelkem"]
         display_df = display_df[cols]
+
+        df_players = load_players()
+       
+        players_count = len(df_players)
+        st.metric("Celkový počet sportovců s členským příspěvkem",  players_count)
+        st.download_button(
+            label="Stáhnout seznam sportovců s členským příspěvkem",
+            data=df_players.to_csv(index=False).encode("utf-8"),
+            file_name="sportovci_s_clen_prispevek.csv",
+            mime="text/csv",
+        )
 
         # Display metrics
         col1, col2 = st.columns(2)
@@ -393,10 +439,8 @@ try:
         filtered_legitimace = filtered_df['Legitimace'].unique()
         
         # Create participation details DataFrame for filtered players
-        all_participations_df = df[
-            df['Legitimace'].isin(filtered_legitimace)
-        ][['Legitimace', 'Prijmeni', 'Jmena', 'KlubNazev', 'TurnajId', 'TurnajNazev', 'TurnajOd', 'TurnajDo', 'KategorieTurnaje', 'DobaTurnaje']
-        ].sort_values(['Prijmeni', 'Jmena', 'TurnajOd'])
+        all_participations_df = all_participations_df[['Legitimace', 'Prijmeni', 'Jmena', 'Rocnik', 'KlubNazev', 'TurnajId', 'TurnajNazev', 'TurnajOd', 'TurnajDo', 'KategorieTurnaje', 'DobaTurnaje']
+            ].sort_values(['Prijmeni', 'Jmena', 'TurnajOd'])
         
         # Display metrics
         col1, col2 = st.columns(2)
