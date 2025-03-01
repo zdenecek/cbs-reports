@@ -15,6 +15,8 @@ def init_connection():
         + st.secrets["database"]
         + ";UID="
         + st.secrets["username"]
+        + ";TrustServerCertificate=yes"
+        + ";Encrypt=No"
         + ";PWD="
         + st.secrets["password"]
     )
