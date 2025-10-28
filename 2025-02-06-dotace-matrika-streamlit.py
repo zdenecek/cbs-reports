@@ -34,7 +34,7 @@ SELECT DISTINCT
 FROM [db3206].[dbo].[Prispevek] p
 JOIN [db3206].[dbo].[Hrac] ON  Legitimace = p.IdHrace
 LEFT JOIN Klub k ON k.Id = IdKlubu
-WHERE p.IdSezony = 2024
+WHERE p.IdSezony = 2025
 
     """
     df = pd.read_sql(q, conn)
@@ -56,11 +56,12 @@ def load_data():
         t.Nazev as TurnajNazev,
         t.DatumOd as TurnajOd,
         t.DatumDo as TurnajDo,
+        COALESCE(t.PocetHracichDni, 1) as DobaTurnaje,
         kt.Nazev as KategorieTurnaje,
         CASE 
             WHEN p.Id IS NOT NULL THEN 'Ano'
             ELSE 'Ne'
-        END as ClenPrispevek2024,
+        END as ClenPrispevek2025,
         COALESCE(r._AktualniKB, 0) as Body,
         COALESCE(r.Poradi, 0) as PoradiVZebricku,
         dbo.GetKategorieHrace(h.Rocnik, h.PohlaviM, null) as Kategorie
@@ -70,54 +71,15 @@ def load_data():
     INNER JOIN Turnaj t ON t.Id = s.IdTurnaje
     LEFT JOIN Klub k ON k.Id = h.IdKlubu
     LEFT JOIN KategorieTurnaje kt ON kt.Id = t.IdKategorie
-    LEFT JOIN Prispevek p ON p.IdHrace = h.Legitimace AND p.IdSezony = 2024
+    LEFT JOIN Prispevek p ON p.IdHrace = h.Legitimace AND p.IdSezony = 2025
     LEFT JOIN vRanking r ON r.Legitimace = h.Legitimace
     WHERE 
-        t.DatumOd >= CONVERT(datetime, '2023-11-01', 120)
-        AND t.DatumOd <= CONVERT(datetime, '2024-10-31', 120)
+        t.DatumOd >= CONVERT(datetime, '2024-11-01', 120)
+        AND t.DatumOd <= CONVERT(datetime, '2025-10-31', 120)
     ORDER BY Prijmeni, Jmena
     """
     df = pd.read_sql(ucasti_sql, conn)
     
-
-    # Calculate tournament duration
-    df["DobaTurnaje"] = (
-        pd.to_datetime(df["TurnajDo"]) - pd.to_datetime(df["TurnajOd"])
-    ).dt.days
-    df.loc[df["DobaTurnaje"] == 0, "DobaTurnaje"] = 1
-
-    # Manual adjustments for long tournaments
-
-    long_tournament_mapping = {
-        "Skupinovka České Budějovice - Jaro 2024": 6,
-        "Skupinovka České Budějovice - Podzim 2024": 6,
-        "Pražská skupinová A zima 2023": 5,
-        "1. Liga 2024": 8,
-        "Skupinová A - Jaro 2024": 5,
-        "Pražská skupinová A léto 2024": 5,
-        "Pražská skupinovka A Jaro 2024": 5,
-        "Pražská liga jaro 2024": 10,
-        "Skupinová A Podzim 2024": 5,
-        "2. Liga 2024": 8,
-        "Skupinová B Podzim 2024": 9,
-        "Pražská Skupinová B Jaro 2024": 9,
-        "Pražská švýcarská skupinovka jaro 2024": 5,
-        "Švýcarská skupinovka podzim 2024": 5,
-        "Brno skupinovka 09/24 - 01/25": 6,
-        "Brno - Skupinovka": 6,
-    }
-
-    # Upravíme počet dnů soutěží pro dlouhodobé turnaje
-    for tournament, days in long_tournament_mapping.items():
-        df.loc[df["TurnajNazev"] == tournament, "DobaTurnaje"] = days
-
-    # Zobrazime mapovani
-    for tournament, days in long_tournament_mapping.items():
-        print(f"{tournament}".ljust(45), f"{days} dní")
-
-    for tournament, days in long_tournament_mapping.items():
-        df.loc[df["TurnajNazev"] == tournament, "DobaTurnaje"] = days
-
     # Fill NA for kategorie
     df["KategorieTurnaje"] = df["KategorieTurnaje"].fillna("Bez kategorie")
 
@@ -156,7 +118,7 @@ try:
 
     # Filter out unwanted categories and non-members
     df = df[
-         (df["ClenPrispevek2024"] == "Ano")
+         (df["ClenPrispevek2025"] == "Ano")
     ]
 
 
@@ -233,7 +195,7 @@ try:
         st.title("Report registrovaných sportovců Českého bridžového svazu")
         st.markdown("""
         Tento report zobrazuje seznam sportovců, kteří se zúčastnili více než 6 dnů soutěží 
-        v období od 1.11.2023 do 30.10.2024 a mají zaplacené příspěvky za rok 2024.
+        v období od 1.11.2024 do 30.10.2025 a mají zaplacené příspěvky za rok 2025.
         
         Data jsou načtena z matriky Českého bridžového svazu, která je dostupná na adrese https://matrikacbs.cz/
 
