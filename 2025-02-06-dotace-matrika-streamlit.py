@@ -116,10 +116,7 @@ def split_points(kb_points):
 try:
     df = load_data()
 
-    # Filter out unwanted categories and non-members
-    df = df[
-         (df["ClenPrispevek2025"] == "Ano")
-    ]
+
 
 
     
@@ -225,6 +222,11 @@ try:
             options=kluby,
             default=[]
         )
+        
+        only_with_prispevek = st.sidebar.checkbox(
+            "Filtrovat pouze sportovce s členským příspěvkem",
+            value=True
+        )
 
         # Add tournament category filter
         st.sidebar.markdown("### Filtrovat podle kategorie turnaje:")
@@ -251,6 +253,7 @@ try:
                     "Body",
                     "PoradiVZebricku",
                     "Kategorie",
+                    "ClenPrispevek2025",
                 ]
             )["DobaTurnaje"]
             .sum()
@@ -264,8 +267,11 @@ try:
             (sportovci_dny["Pocet dni"] >= min_dny) 
             # & (sportovci_dny["Rocnik"] >= rok_od)
             # & (sportovci_dny["Rocnik"] <= rok_do)
-             
+            & (sportovci_dny["KlubNazev"].isin(vybrane_kluby))
+           
         ]
+        if only_with_prispevek:
+            filtered_df = filtered_df[filtered_df["ClenPrispevek2025"] == "Ano"]
 
 
 
@@ -345,7 +351,7 @@ try:
                     "Legitimace",
                     help="Číslo legitimace hráče (kliknutím zobrazíte detail)",
                     validate="^https://.*",
-                    display_text="https://matrikacbs.cz/Detail-hrace.aspx\?id=(.*)",
+                    display_text="https://matrikacbs.cz/Detail-hrace.aspx/?id=(.*)",
                     pinned=True
                 ),
                 "Prijmeni": "Příjmení",
