@@ -122,7 +122,7 @@ try:
     st.sidebar.header("Nastavení sezóny")
     selected_season = st.sidebar.selectbox(
         "Vyberte sezónu:",
-        options=[2026, 2025, 2024, 2023, 2022, 2021],
+        options=[2026, 2025, 2024],
         index=1
     )
     
