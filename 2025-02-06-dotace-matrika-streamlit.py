@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import pyodbc
 
+debug = True
+
 st.set_page_config(
     page_title="SPORTOVCI ČBS", page_icon="♣️", layout="wide"
 )
@@ -25,8 +27,8 @@ conn = init_connection()
 
 
 @st.cache_data
-def load_players():
-    q = """
+def load_players(season):
+    q = f"""
 
 SELECT DISTINCT
     Jmena, Prijmeni, Legitimace, Rocnik, k.Nazev as KlubNazev,
@@ -34,7 +36,7 @@ SELECT DISTINCT
 FROM [db3206].[dbo].[Prispevek] p
 JOIN [db3206].[dbo].[Hrac] ON  Legitimace = p.IdHrace
 LEFT JOIN Klub k ON k.Id = IdKlubu
-WHERE p.IdSezony = 2025
+WHERE p.IdSezony = {season}
 
     """
     df = pd.read_sql(q, conn)
@@ -42,10 +44,12 @@ WHERE p.IdSezony = 2025
 
 # Load data
 @st.cache_data
-def load_data():
+def load_data(season):
+    # Calculate date range for season (season N runs from Nov 1 of year N-1 to Oct 31 of year N)
+    date_from = f"{season - 1}-11-01"
+    date_to = f"{season}-10-31"
 
-
-    ucasti_sql = """
+    ucasti_sql = f"""
     SELECT 
         h.Legitimace,
         h.Prijmeni,
@@ -71,11 +75,11 @@ def load_data():
     INNER JOIN Turnaj t ON t.Id = s.IdTurnaje
     LEFT JOIN Klub k ON k.Id = h.IdKlubu
     LEFT JOIN KategorieTurnaje kt ON kt.Id = t.IdKategorie
-    LEFT JOIN Prispevek p ON p.IdHrace = h.Legitimace AND p.IdSezony = 2025
+    LEFT JOIN Prispevek p ON p.IdHrace = h.Legitimace AND p.IdSezony = {season}
     LEFT JOIN vRanking r ON r.Legitimace = h.Legitimace
     WHERE 
-        t.DatumOd >= CONVERT(datetime, '2024-11-01', 120)
-        AND t.DatumOd <= CONVERT(datetime, '2025-10-31', 120)
+        t.DatumOd >= CONVERT(datetime, '{date_from}', 120)
+        AND t.DatumOd <= CONVERT(datetime, '{date_to}', 120)
     ORDER BY Prijmeni, Jmena
     """
     df = pd.read_sql(ucasti_sql, conn)
@@ -114,7 +118,15 @@ def split_points(kb_points):
 
 
 try:
-    df = load_data()
+    # Season selector (before loading data)
+    st.sidebar.header("Nastavení sezóny")
+    selected_season = st.sidebar.selectbox(
+        "Vyberte sezónu:",
+        options=[2026, 2025, 2024, 2023, 2022, 2021],
+        index=1
+    )
+    
+    df = load_data(selected_season)
 
 
 
@@ -190,9 +202,14 @@ try:
 
         # Title
         st.title("Report registrovaných sportovců Českého bridžového svazu")
-        st.markdown("""
+        
+        # Calculate date range for display
+        date_from_display = f"1.11.{selected_season - 1}"
+        date_to_display = f"30.10.{selected_season}"
+        
+        st.markdown(f"""
         Tento report zobrazuje seznam sportovců, kteří se zúčastnili více než 6 dnů soutěží 
-        v období od 1.11.2024 do 30.10.2025 a mají zaplacené příspěvky za rok 2025.
+        v období od {date_from_display} do {date_to_display} a mají zaplacené příspěvky za rok {selected_season}.
         
         Data jsou načtena z matriky Českého bridžového svazu, která je dostupná na adrese https://matrikacbs.cz/
 
@@ -205,12 +222,12 @@ try:
         min_rok = int(df["Rocnik"].min())
         max_rok = int(df["Rocnik"].max())
 
-        # rok_od, rok_do = st.sidebar.slider(
-        #     "Rozmezí roků narození:",
-        #     min_value=min_rok,
-        #     max_value=max_rok,
-        #     value=(1975, 2001),
-        # )
+        rok_od, rok_do = st.sidebar.slider(
+            "Rozmezí roků narození:",
+            min_value=min_rok,
+            max_value=max_rok,
+            value=(min_rok, max_rok),
+        )
 
         min_dny = st.sidebar.number_input(
             "Minimální počet dní účasti:", min_value=1, value=6
@@ -228,8 +245,6 @@ try:
             value=True
         )
 
-        # Add tournament category filter
-        st.sidebar.markdown("### Filtrovat podle kategorie turnaje:")
         kategorie_turnaju = sorted([k for k in df['KategorieTurnaje'].unique() if pd.notna(k)])
         vybrane_kategorie = st.sidebar.multiselect(
             "Filtrovat podle kategorie turnaje:",
@@ -265,11 +280,12 @@ try:
         # Apply filters
         filtered_df = sportovci_dny[
             (sportovci_dny["Pocet dni"] >= min_dny) 
-            # & (sportovci_dny["Rocnik"] >= rok_od)
-            # & (sportovci_dny["Rocnik"] <= rok_do)
-            & (sportovci_dny["KlubNazev"].isin(vybrane_kluby))
-           
+            & (sportovci_dny["Rocnik"] >= rok_od)
+            & (sportovci_dny["Rocnik"] <= rok_do)
         ]
+        
+        if vybrane_kluby:
+            filtered_df = filtered_df[filtered_df["KlubNazev"].isin(vybrane_kluby)]
         if only_with_prispevek:
             filtered_df = filtered_df[filtered_df["ClenPrispevek2025"] == "Ano"]
 
@@ -287,7 +303,9 @@ try:
 
         # Split points into three columns
         display_df[["ZB", "SB", "KB"]] = pd.DataFrame(
-            display_df["Body"].apply(split_points).tolist(), index=display_df.index
+            display_df["Body"].apply(split_points).tolist(), 
+            columns=["ZB", "SB", "KB"],
+            index=display_df.index
         )
 
         # Rename Body to BodyCelkem and move it to the end
@@ -295,7 +313,7 @@ try:
         cols = [col for col in display_df.columns if col != "BodyCelkem"] + ["BodyCelkem"]
         display_df = display_df[cols]
 
-        df_players = load_players()
+        df_players = load_players(selected_season)
        
         players_count = len(df_players)
         st.metric("Celkový počet sportovců s členským příspěvkem",  players_count)
@@ -351,7 +369,7 @@ try:
                     "Legitimace",
                     help="Číslo legitimace hráče (kliknutím zobrazíte detail)",
                     validate="^https://.*",
-                    display_text="https://matrikacbs.cz/Detail-hrace.aspx/?id=(.*)",
+                    display_text=".*id=(.*)",
                     pinned=True
                 ),
                 "Prijmeni": "Příjmení",
@@ -475,5 +493,8 @@ try:
 
 
 
+
 except Exception as e:
     st.error(f"Nastala chyba při načítání dat: {str(e)}")
+    if debug:
+        raise
