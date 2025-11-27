@@ -257,24 +257,23 @@ try:
             all_participations_df = all_participations_df[all_participations_df["KategorieTurnaje"].isin(vybrane_kategorie)]
         
         
+        # Group by Legitimace only to sum days, then get person details from first row
         sportovci_dny = (
-            all_participations_df.groupby(
-                [
-                    "Legitimace",
-                    "Prijmeni",
-                    "Jmena",
-                    "Rocnik",
-                    "KlubNazev",
-                    "Body",
-                    "PoradiVZebricku",
-                    "Kategorie",
-                    "ClenPrispevek2025",
-                ]
-            )["DobaTurnaje"]
-            .sum()
+            all_participations_df
+            .groupby("Legitimace")
+            .agg(
+                Pocet_dni=("DobaTurnaje", "sum"),
+                Prijmeni=("Prijmeni", "first"),
+                Jmena=("Jmena", "first"),
+                Rocnik=("Rocnik", "first"),
+                KlubNazev=("KlubNazev", "first"),
+                Body=("Body", "first"),
+                PoradiVZebricku=("PoradiVZebricku", "first"),
+                Kategorie=("Kategorie", "first"),
+                ClenPrispevek2025=("ClenPrispevek2025", "first"),
+            )
             .reset_index()
-            .rename(columns={"DobaTurnaje": "Pocet dni"})
-        )
+        ).rename(columns={"Pocet_dni": "Pocet dni"})
 
 
         # Apply filters
